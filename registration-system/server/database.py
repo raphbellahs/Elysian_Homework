@@ -1,26 +1,26 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from pymongo import MongoClient
+import os
+from dotenv import load_dotenv
 
-# Create the database engine
-engine = create_engine('sqlite:///registration.db')
+load_dotenv()
 
-# Create a session factory
-Session = sessionmaker(bind=engine)
+class Database:
+    def __init__(self):
+        # Get MongoDB connection string from environment variables
+        mongodb_uri = os.getenv('MONGODB_URI')
+        try:
+            self.client = MongoClient(mongodb_uri)
+            # Test the connection
+            self.client.admin.command('ping')
+            print("Successfully connected to MongoDB!")
+            self.db = self.client['elysian_db']
+            self.users = self.db['users']
+        except Exception as e:
+            print(f"Error connecting to MongoDB: {e}")
+            raise
 
-# Create a base class for declarative models
-Base = declarative_base()
+    def add_user(self, user_data):
+        return self.users.insert_one(user_data)
 
-class User(Base):
-    __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True)
-    username = Column(String(50), unique=True, nullable=False)
-    email = Column(String(120), unique=True, nullable=False)
-    password = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-def init_db():
-    # Create all tables
-    Base.metadata.create_all(engine) 
+    def get_user(self, email):
+        return self.users.find_one({"email": email}) 

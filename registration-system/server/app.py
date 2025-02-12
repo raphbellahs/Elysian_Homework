@@ -1,51 +1,67 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-from database import init_db, User, Session
-import bcrypt
+from database import Database
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+db = Database()
 
-# Initialize the database
-init_db()
+# Message service URL (Node.js server)
+MESSAGE_SERVICE_URL = os.getenv('MESSAGE_SERVICE_URL', 'http://localhost:3000')
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    data = request.json
     
-    if not all(key in data for key in ['username', 'email', 'password']):
-        return jsonify({'message': 'Missing required fields'}), 400
-    
-    session = Session()
+    # Basic validation
+    if not all(k in data for k in ["email", "password", "name"]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    # Check if user already exists
+    if db.get_user(data['email']):
+        return jsonify({"error": "User already exists"}), 409
+
+    # Add user to database
+    db.add_user(data)
+
+    # Request welcome message from message service
     try:
-        # Check if user already exists
-        if session.query(User).filter_by(email=data['email']).first():
-            return jsonify({'message': 'Email already registered'}), 400
-        
-        if session.query(User).filter_by(username=data['username']).first():
-            return jsonify({'message': 'Username already taken'}), 400
-        
-        # Hash the password
-        hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-        
-        # Create new user
-        new_user = User(
-            username=data['username'],
-            email=data['email'],
-            password=hashed_password.decode('utf-8')
-        )
-        
-        session.add(new_user)
-        session.commit()
-        
-        return jsonify({'message': 'User registered successfully'}), 201
+        response = requests.post(f"{MESSAGE_SERVICE_URL}/generate-message", 
+                               json={"name": data['name']})
+        welcome_message = response.json().get('message')
+    except requests.RequestException:
+        welcome_message = "Welcome to our service!"
+
+    return jsonify({
+        "message": "Registration successful",
+        "welcome_message": welcome_message
+    }), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+
+    # Basic validation
+    if not all(k in data for k in ["email", "password"]):
+        return jsonify({"error": "Missing email or password"}), 400
+
+    # Get user from database
+    user = db.get_user(data['email'])
     
-    except Exception as e:
-        session.rollback()
-        return jsonify({'message': str(e)}), 500
-    
-    finally:
-        session.close()
+    # Check if user exists and password matches
+    if not user or user['password'] != data['password']:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    return jsonify({
+        "message": "Login successful",
+        "user": {
+            "email": user['email'],
+            "name": user['name']
+        }
+    }), 200
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(host='0.0.0.0', port=5000)
