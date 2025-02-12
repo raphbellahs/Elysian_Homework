@@ -1,0 +1,61 @@
+# Workflow for deploying the Python Registration Service to Azure
+name: Python Registration Service CI/CD
+
+# Trigger the workflow on:
+# 1. Push to main branch
+# 2. Manual trigger from GitHub Actions tab
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'registration-system/server/**'  # Only trigger on server directory changes
+  workflow_dispatch:  # Manual trigger
+
+env:
+  AZURE_WEBAPP_NAME: elysian-signin    # Update this to match your Azure Web App name
+  PYTHON_VERSION: '3.9'                      # Python version
+  SERVER_PATH: 'registration-system/server'   # Path to server code
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Check out the repository code
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    # Install dependencies and create virtual environment
+    - name: Install dependencies
+      run: |
+        cd ${{ env.SERVER_PATH }}
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    # Deploy to Azure Web App
+    - name: Deploy to Azure
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ${{ env.SERVER_PATH }}
+
+    # Configure Azure Web App settings
+    - name: Configure App Settings
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az webapp config appsettings set \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --resource-group elysian-group \
+            --settings \
+              MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+              JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" 
