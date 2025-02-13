@@ -1,133 +1,164 @@
-# Workflow for deploying the Registration System to Azure Web Apps
-# This workflow handles building, testing, and deploying the Python registration system
-
 name: Deploy Registration System to Azure
 
 on:
-  # Trigger on pushes to main branch
   push:
     branches:
       - main
     paths:
-      - 'registration-system/server/**'  # Only trigger when server code changes
-  # Allow manual triggers from GitHub Actions UI
-  workflow_dispatch:
+      - 'registration-system/server/**'
+  workflow_dispatch:  # Allow manual trigger
+
+# Define environment variables used across jobs
+env:
+  PYTHON_VERSION: '3.9'
+  APP_NAME: 'elysian-signup-server'
+  RESOURCE_GROUP: 'elysian-group'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read  # Required for checking out code
+      contents: read
 
     steps:
-      # Step 1: Get the code
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python environment
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'  # Match your local Python version
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'  # Enable pip caching
 
-      # Step 3: Create and activate virtual environment
-      - name: Set up virtual environment
-        run: |
-          cd registration-system/server
-          python -m venv venv
-          source venv/bin/activate
-
-      # Step 4: Install project dependencies
       - name: Install dependencies
+        working-directory: registration-system/server
         run: |
-          cd registration-system/server
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest  # Ensure pytest is installed
 
-      # Step 5: Run local tests
       - name: Run local tests
-        run: |
-          cd registration-system/server
-          python -m pytest tests/ -v
+        working-directory: registration-system/server
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
           USE_LIVE_SERVER: "false"
-
-      # Step 6: Prepare deployment package
-      - name: Create deployment package
         run: |
-          cd registration-system/server
-          zip -r ../../release.zip ./*
+          python -m pytest tests/ -v
+        continue-on-error: false  # Fail the workflow if tests fail
 
-      # Step 7: Upload deployment package for the deploy job
+      - name: Create deployment package
+        working-directory: registration-system/server
+        run: |
+          zip -r ../../release.zip ./*
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            release.zip
-            !**/venv/**
+          path: release.zip
+          retention-days: 1  # Only keep for 1 day to save storage
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build  # Wait for build job to complete
+    needs: build
     environment:
       name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    
     permissions:
-      id-token: write  # Required for Azure authentication
-      contents: read   # Required for code access
+      id-token: write
+      contents: read
+
+    outputs:
+      webapp-url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-      # Step 1: Get built artifact
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: python-app
+          
+      - name: Unzip deployment package
+        run: |
+          unzip release.zip
+          rm release.zip  # Clean up after unzipping
 
-      # Step 2: Extract deployment package
-      - name: Prepare deployment
-        run: unzip release.zip
-
-      # Step 3: Authenticate with Azure
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-
-      # Step 4: Deploy to Azure Web App
-      - name: Deploy to Azure
-        uses: azure/webapps-deploy@v3
+      - name: Deploy to Azure Web App
         id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
         with:
-          app-name: 'elysian-signup-server'  # Your Azure Web App name
+          app-name: ${{ env.APP_NAME }}
           slot-name: 'Production'
-          startup-command: 'pip install -r requirements.txt && python app.py' 
+          startup-command: 'pip install -r requirements.txt && python app.py'
 
-      # Step 5: Configure application settings
       - name: Configure App Settings
         uses: azure/CLI@v1
         with:
           inlineScript: |
             az webapp config appsettings set \
-              --name elysian-signup-server \
-              --resource-group elysian-group \
+              --name ${{ env.APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
               --settings \
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" 
+                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}"
 
-      # Step 7: Run online tests
-      - name: Run online tests
+  test-deployment:
+    runs-on: ubuntu-latest
+    needs: deploy
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: registration-system/server
         run: |
-          cd registration-system/server
-          python -m pytest tests/ -v
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run deployment tests
+        working-directory: registration-system/server
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
           USE_LIVE_SERVER: "true"
-          API_URL: ${{ steps.deploy-to-webapp.outputs.webapp-url }}  # Get URL from deployment output
+          API_URL: ${{ needs.deploy.outputs.webapp-url }}
+        run: |
+          echo "Testing deployment at: $API_URL"
+          python -m pytest tests/ -v
+        timeout-minutes: 5  # Set a timeout for the tests
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy, test-deployment]
+    if: always()  # Run even if previous jobs fail
+    
+    steps:
+      - name: Check deployment status
+        if: needs.deploy.result == 'success' && needs.test-deployment.result == 'success'
+        run: |
+          echo "✅ Deployment and testing completed successfully"
+          # Add notification logic here (e.g., Slack, Email)
+          
+      - name: Check for failures
+        if: needs.deploy.result != 'success' || needs.test-deployment.result != 'success'
+        run: |
+          echo "❌ Deployment or testing failed"
+          # Add failure notification logic here
+          exit 1  # Fail the workflow to make it visible in GitHub
