@@ -30,21 +30,27 @@ jobs:
         with:
           python-version: '3.9'  # Match your local Python version
 
-      # Step 3: Create and activate virtual environment
+      # Step 3: Display working directory
+      - name: Display working directory
+        run: |
+          pwd
+          ls -la
+
+      # Step 4: Create and activate virtual environment
       - name: Set up virtual environment
         run: |
           cd registration-system/server
           python -m venv venv
           source venv/bin/activate
 
-      # Step 4: Install project dependencies
+      # Step 5: Install project dependencies
       - name: Install dependencies
         run: |
           cd registration-system/server
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 5: Run local tests
+      # Step 6: Run local tests
       - name: Run local tests
         run: |
           cd registration-system/server
@@ -55,20 +61,18 @@ jobs:
           MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
           USE_LIVE_SERVER: "false"
 
-      # Step 6: Prepare deployment package
+      # Step 7: Prepare deployment package
       - name: Create deployment package
         run: |
           cd registration-system/server
           zip -r ../../release.zip ./*
 
-      # Step 7: Upload deployment package for the deploy job
+      # Step 8: Upload deployment package for the deploy job
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            release.zip
-            !**/venv/**
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -82,21 +86,26 @@ jobs:
 
     steps:
       # Step 1: Get built artifact
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: python-app
+          path: ./
 
       # Step 2: Extract deployment package
       - name: Prepare deployment
-        run: unzip release.zip
+        run: |
+          unzip release.zip -d deploy
+          ls -la deploy
 
       # Step 3: Authenticate with Azure
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
 
       # Step 4: Deploy to Azure Web App
       - name: Deploy to Azure
@@ -105,34 +114,37 @@ jobs:
         with:
           app-name: 'elysian-signup-server'
           slot-name: 'Production'
-          package: release.zip
+          package: deploy
           startup-command: 'gunicorn --config gunicorn.conf.py app:app'
 
       # Add health check after deployment
       - name: Health check
         run: |
           echo "Waiting for application to start..."
-          sleep 30  # Give the app some time to start
+          sleep 60  # Increased wait time
           curl -v ${{ steps.deploy-to-webapp.outputs.webapp-url }}/health || true
         continue-on-error: true
 
       # Step 5: Configure application settings
-      - name: Configure App Settings
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az webapp config appsettings set \
-              --name elysian-signup-server \
-              --resource-group elysian-group \
-              --settings \
-                MONGODB_URI="${{ secrets.MONGODB_URI }}" \
-                JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" 
+      - name: Set Azure App Settings
+        run: |
+          az webapp config appsettings set --name elysian-signup-server --resource-group elysian-group --settings \
+            MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" \
+            WEBSITE_RUN_FROM_PACKAGE=1
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_SECRET: ${{ secrets.AZURE_SECRET }}
+          AZURE_TENANT: ${{ secrets.AZURE_TENANT }}
 
       # Step 7: Run online tests
       - name: Run online tests
         run: |
           cd registration-system/server
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
           python -m pytest tests/ -v
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
