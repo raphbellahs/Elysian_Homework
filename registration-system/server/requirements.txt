@@ -25,3 +25,10 @@ pytest-cov==4.1.0
 
 # Requests
 requests==2.26.0
+
+# Server
+gunicorn==21.2.0
+whitenoise==6.6.0  # For serving static files
+
+# Healthcheck
+healthcheck==1.0.0

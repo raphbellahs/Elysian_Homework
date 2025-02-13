@@ -103,9 +103,18 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'elysian-signup-server'  # Your Azure Web App name
+          app-name: 'elysian-signup-server'
           slot-name: 'Production'
-          startup-command: 'pip install -r requirements.txt && python app.py' 
+          package: release.zip
+          startup-command: 'gunicorn --config gunicorn.conf.py app:app'
+
+      # Add health check after deployment
+      - name: Health check
+        run: |
+          echo "Waiting for application to start..."
+          sleep 30  # Give the app some time to start
+          curl -v ${{ steps.deploy-to-webapp.outputs.webapp-url }}/health || true
+        continue-on-error: true
 
       # Step 5: Configure application settings
       - name: Configure App Settings
