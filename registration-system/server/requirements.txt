@@ -8,3 +8,7 @@ psycopg2-binary==2.9.9
 bcrypt==4.0.1
 pyjwt==2.8.0 
 werkzeug==2.0.1
+
+# Testing dependencies
+pytest==7.4.4
+pytest-cov==4.1.0
