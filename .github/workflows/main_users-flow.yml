@@ -14,9 +14,6 @@ jobs:
     environment:
       name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Check out repository
@@ -51,14 +48,13 @@ jobs:
           package: release.zip
           startup-command: 'gunicorn app:app'
 
-      # Configure app settings after deployment
       - name: Configure App Settings
         uses: azure/CLI@v1
         with:
           inlineScript: |
             az webapp config appsettings set \
               --name elysian-signup-server \
-              --resource-group elysian-group \
+              --resource-group elysian-ressource \
               --settings \
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
