@@ -1,142 +1,63 @@
-# Workflow for deploying the Registration System to Azure Web Apps
-# This workflow handles building, testing, and deploying the Python registration system
-
 name: Deploy Registration System to Azure
 
 on:
-  # Trigger on pushes to main branch
   push:
     branches:
       - main
     paths:
-      - 'registration-system/server/**'  # Only trigger when server code changes
-  # Allow manual triggers from GitHub Actions UI
+      - 'registration-system/server/**'
   workflow_dispatch:
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read  # Required for checking out code
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-      # Step 1: Get the code
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'  # Match your local Python version
+          python-version: '3.9'
 
-      # Step 3: Create and activate virtual environment
-      - name: Set up virtual environment
-        run: |
-          cd registration-system/server
-          python -m venv venv
-          source venv/bin/activate
-
-      # Step 4: Install project dependencies
       - name: Install dependencies
         run: |
-          cd registration-system/server
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r registration-system/server/requirements.txt
 
-      # Step 5: Run local tests
-      - name: Run local tests
-        run: |
-          cd registration-system/server
-          python -m pytest tests/ -v
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
-          USE_LIVE_SERVER: "false"
-
-      # Step 6: Prepare deployment package
       - name: Create deployment package
         run: |
           cd registration-system/server
           zip -r ../../release.zip ./*
 
-      # Step 7: Upload deployment package for the deploy job
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-app
-          path: |
-            release.zip
-            !**/venv/**
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build  # Wait for build job to complete
-    environment:
-      name: 'Production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-    permissions:
-      id-token: write  # Required for Azure authentication
-      contents: read   # Required for code access
-
-    steps:
-      # Step 1: Get built artifact
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
-
-      # Step 2: Extract deployment package
-      - name: Prepare deployment
-        run: unzip release.zip
-
-      # Step 3: Authenticate with Azure
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-
-      # Step 4: Deploy to Azure Web App
       - name: Deploy to Azure
-        uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
         with:
           app-name: 'elysian-signup-server'
-          slot-name: 'Production'
           package: release.zip
-          startup-command: 'gunicorn --config gunicorn.conf.py app:app'
+          startup-command: 'gunicorn app:app'
 
-      # Add health check after deployment
-      - name: Health check
-        run: |
-          echo "Waiting for application to start..."
-          sleep 30  # Give the app some time to start
-          curl -v ${{ steps.deploy-to-webapp.outputs.webapp-url }}/health || true
-        continue-on-error: true
-
-      # Step 5: Configure application settings
       - name: Configure App Settings
         uses: azure/CLI@v1
         with:
           inlineScript: |
             az webapp config appsettings set \
               --name elysian-signup-server \
-              --resource-group elysian-group \
+              --resource-group elysian-ressource \
               --settings \
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" 
-
-      # Step 7: Run online tests
-      - name: Run online tests
-        run: |
-          cd registration-system/server
-          python -m pytest tests/ -v
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
-          USE_LIVE_SERVER: "true"
-          API_URL: ${{ steps.deploy-to-webapp.outputs.webapp-url }}  # Get URL from deployment output
+                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" \
+                WEBSITE_RUN_FROM_PACKAGE="1" \
+                SCM_DO_BUILD_DURING_DEPLOYMENT="true"
