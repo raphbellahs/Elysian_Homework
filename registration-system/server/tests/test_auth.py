@@ -1,5 +1,5 @@
 import pytest
-from app import app
+from app import app, db
 import json
 from bson import ObjectId
 
@@ -8,6 +8,14 @@ def client():
     app.config['TESTING'] = True
     with app.test_client() as client:
         yield client
+
+@pytest.fixture(autouse=True)
+def cleanup():
+    # Clean up before each test
+    db.users.delete_many({})
+    yield
+    # Clean up after each test
+    db.users.delete_many({})
 
 def test_signup_success(client):
     """Test successful user registration"""
