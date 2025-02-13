@@ -14,39 +14,38 @@ def test_signup_success(client):
     test_user = {
         "email": "test@example.com",
         "password": "Test123!",
-        "firstName": "Test",
-        "lastName": "User"
+        "name": "Test User"
     }
     
-    response = client.post('/api/auth/signup', 
+    response = client.post('/register', 
                           data=json.dumps(test_user),
                           content_type='application/json')
     
     assert response.status_code == 201
     data = json.loads(response.data)
     assert "token" in data
-    assert data["message"] == "User registered successfully"
+    assert "welcome_message" in data
+    assert data["message"] == "Registration successful"
 
 def test_signup_duplicate_email(client):
     """Test registration with existing email"""
     test_user = {
         "email": "test@example.com",
         "password": "Test123!",
-        "firstName": "Test",
-        "lastName": "User"
+        "name": "Test User"
     }
     
     # First registration
-    client.post('/api/auth/signup', 
+    client.post('/register', 
                 data=json.dumps(test_user),
                 content_type='application/json')
     
     # Attempt duplicate registration
-    response = client.post('/api/auth/signup', 
+    response = client.post('/register', 
                           data=json.dumps(test_user),
                           content_type='application/json')
     
-    assert response.status_code == 400
+    assert response.status_code == 409
     data = json.loads(response.data)
     assert "error" in data
     assert "already exists" in data["error"]
@@ -57,11 +56,10 @@ def test_login_success(client):
     test_user = {
         "email": "login@example.com",
         "password": "Test123!",
-        "firstName": "Test",
-        "lastName": "User"
+        "name": "Test User"
     }
     
-    client.post('/api/auth/signup', 
+    client.post('/register', 
                 data=json.dumps(test_user),
                 content_type='application/json')
     
@@ -71,13 +69,14 @@ def test_login_success(client):
         "password": "Test123!"
     }
     
-    response = client.post('/api/auth/login',
+    response = client.post('/login',
                           data=json.dumps(login_data),
                           content_type='application/json')
     
     assert response.status_code == 200
     data = json.loads(response.data)
     assert "token" in data
+    assert "user" in data
 
 def test_login_invalid_credentials(client):
     """Test login with wrong password"""
@@ -85,11 +84,10 @@ def test_login_invalid_credentials(client):
     test_user = {
         "email": "wrong@example.com",
         "password": "Test123!",
-        "firstName": "Test",
-        "lastName": "User"
+        "name": "Test User"
     }
     
-    client.post('/api/auth/signup', 
+    client.post('/register', 
                 data=json.dumps(test_user),
                 content_type='application/json')
     
@@ -99,7 +97,7 @@ def test_login_invalid_credentials(client):
         "password": "WrongPassword123!"
     }
     
-    response = client.post('/api/auth/login',
+    response = client.post('/login',
                           data=json.dumps(login_data),
                           content_type='application/json')
     
