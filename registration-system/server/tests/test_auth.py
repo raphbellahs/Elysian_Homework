@@ -1,21 +1,51 @@
 import pytest
 from app import app, db
 import json
-from bson import ObjectId
+import os
+import requests
+
+# Get the API URL from environment variable, default to local if not set
+API_URL = os.getenv('API_URL', 'http://localhost:5000')
+USE_LIVE_SERVER = os.getenv('USE_LIVE_SERVER', 'false').lower() == 'true'
 
 @pytest.fixture
 def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+    if USE_LIVE_SERVER:
+        # Return a session object for live server testing
+        return requests.Session()
+    else:
+        # Return Flask test client for local testing
+        app.config['TESTING'] = True
+        with app.test_client() as client:
+            yield client
 
 @pytest.fixture(autouse=True)
 def cleanup():
-    # Clean up before each test
-    db.users.delete_many({})
-    yield
-    # Clean up after each test
-    db.users.delete_many({})
+    if not USE_LIVE_SERVER:  # Only clean local database
+        db.users.delete_many({})
+        yield
+        db.users.delete_many({})
+    else:
+        yield
+
+def make_request(client, method, endpoint, data=None):
+    """Helper function to make requests to either local or live server"""
+    headers = {"Content-Type": "application/json"}
+    
+    if USE_LIVE_SERVER:
+        url = f"{API_URL}{endpoint}"
+        if method == 'POST':
+            response = client.post(url, json=data, headers=headers)
+        else:
+            response = client.get(url, headers=headers)
+    else:
+        if method == 'POST':
+            response = client.post(endpoint, 
+                                 data=json.dumps(data),
+                                 content_type='application/json')
+        else:
+            response = client.get(endpoint)
+    return response
 
 def test_signup_success(client):
     """Test successful user registration"""
@@ -25,12 +55,10 @@ def test_signup_success(client):
         "name": "Test User"
     }
     
-    response = client.post('/register', 
-                          data=json.dumps(test_user),
-                          content_type='application/json')
+    response = make_request(client, 'POST', '/register', test_user)
     
     assert response.status_code == 201
-    data = json.loads(response.data)
+    data = response.json() if USE_LIVE_SERVER else json.loads(response.data)
     assert "token" in data
     assert "welcome_message" in data
     assert data["message"] == "Registration successful"
@@ -38,23 +66,19 @@ def test_signup_success(client):
 def test_signup_duplicate_email(client):
     """Test registration with existing email"""
     test_user = {
-        "email": "test@example.com",
+        "email": "test2@example.com",
         "password": "Test123!",
         "name": "Test User"
     }
     
     # First registration
-    client.post('/register', 
-                data=json.dumps(test_user),
-                content_type='application/json')
+    make_request(client, 'POST', '/register', test_user)
     
     # Attempt duplicate registration
-    response = client.post('/register', 
-                          data=json.dumps(test_user),
-                          content_type='application/json')
+    response = make_request(client, 'POST', '/register', test_user)
     
     assert response.status_code == 409
-    data = json.loads(response.data)
+    data = response.json() if USE_LIVE_SERVER else json.loads(response.data)
     assert "error" in data
     assert "already exists" in data["error"]
 
@@ -67,9 +91,7 @@ def test_login_success(client):
         "name": "Test User"
     }
     
-    client.post('/register', 
-                data=json.dumps(test_user),
-                content_type='application/json')
+    make_request(client, 'POST', '/register', test_user)
     
     # Now try to login
     login_data = {
@@ -77,12 +99,10 @@ def test_login_success(client):
         "password": "Test123!"
     }
     
-    response = client.post('/login',
-                          data=json.dumps(login_data),
-                          content_type='application/json')
+    response = make_request(client, 'POST', '/login', login_data)
     
     assert response.status_code == 200
-    data = json.loads(response.data)
+    data = response.json() if USE_LIVE_SERVER else json.loads(response.data)
     assert "token" in data
     assert "user" in data
 
@@ -95,9 +115,7 @@ def test_login_invalid_credentials(client):
         "name": "Test User"
     }
     
-    client.post('/register', 
-                data=json.dumps(test_user),
-                content_type='application/json')
+    make_request(client, 'POST', '/register', test_user)
     
     # Try to login with wrong password
     login_data = {
@@ -105,10 +123,8 @@ def test_login_invalid_credentials(client):
         "password": "WrongPassword123!"
     }
     
-    response = client.post('/login',
-                          data=json.dumps(login_data),
-                          content_type='application/json')
+    response = make_request(client, 'POST', '/login', login_data)
     
     assert response.status_code == 401
-    data = json.loads(response.data)
+    data = response.json() if USE_LIVE_SERVER else json.loads(response.data)
     assert "error" in data 
