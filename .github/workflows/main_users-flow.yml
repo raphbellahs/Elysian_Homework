@@ -42,6 +42,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'elysian-signup-server'
-          slot-name: 'Production'
           package: release.zip
           startup-command: 'gunicorn app:app --bind=0.0.0.0:$PORT'
