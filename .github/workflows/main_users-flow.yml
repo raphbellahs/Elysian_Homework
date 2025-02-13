@@ -11,6 +11,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Check out repository
@@ -32,15 +38,30 @@ jobs:
           cd registration-system/server
           zip -r ../../release.zip ./*
 
-      # Add Azure login step
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure
+        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'elysian-signup-server'
           package: release.zip
-          startup-command: 'gunicorn app:app --bind=0.0.0.0:$PORT'
+          startup-command: 'gunicorn app:app'
+
+      # Configure app settings after deployment
+      - name: Configure App Settings
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp config appsettings set \
+              --name elysian-signup-server \
+              --resource-group elysian-group \
+              --settings \
+                MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+                JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+                MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" \
+                WEBSITE_RUN_FROM_PACKAGE="1" \
+                SCM_DO_BUILD_DURING_DEPLOYMENT="true"
