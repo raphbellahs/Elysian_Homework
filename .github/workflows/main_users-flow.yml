@@ -54,7 +54,7 @@ jobs:
       - name: Create deployment package
         run: |
           cd registration-system/server
-          zip -r ../../release.zip ./* requirements.txt
+          zip -r ../../release.zip ./*
 
       # Step 7: Upload deployment package for the deploy job
       - name: Upload artifact
