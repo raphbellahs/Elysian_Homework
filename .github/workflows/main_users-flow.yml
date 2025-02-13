@@ -14,6 +14,9 @@ jobs:
     environment:
       name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Check out repository
@@ -29,6 +32,15 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r registration-system/server/requirements.txt
+
+      - name: Create startup script
+        run: |
+          cd registration-system/server
+          echo "#!/bin/bash" > startup.sh
+          echo "cd /home/site/wwwroot" >> startup.sh
+          echo "pip install -r requirements.txt" >> startup.sh
+          echo "gunicorn --bind=0.0.0.0:\$PORT app:app" >> startup.sh
+          chmod +x startup.sh
 
       - name: Create deployment package
         run: |
@@ -46,7 +58,7 @@ jobs:
         with:
           app-name: 'elysian-signup-server'
           package: release.zip
-          startup-command: 'gunicorn app:app'
+          startup-command: './startup.sh'
 
       - name: Configure App Settings
         uses: azure/CLI@v1
@@ -60,4 +72,22 @@ jobs:
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
                 MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" \
                 WEBSITE_RUN_FROM_PACKAGE="1" \
-                SCM_DO_BUILD_DURING_DEPLOYMENT="true"
+                SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
+                PORT="8000" \
+                PYTHON_ENV="production"
+
+      - name: Configure Python
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp config set \
+              --name elysian-signup-server \
+              --resource-group elysian-ressource \
+              --linux-fx-version "PYTHON|3.9" \
+              --startup-file "startup.sh"
+
+      - name: Restart Web App
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp restart --name elysian-signup-server --resource-group elysian-ressource
