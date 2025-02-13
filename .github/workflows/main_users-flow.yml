@@ -54,7 +54,7 @@ jobs:
       - name: Create deployment package
         run: |
           cd registration-system/server
-          zip -r ../../release.zip ./* 
+          zip -r ../../release.zip ./* requirements.txt
 
       # Step 7: Upload deployment package for the deploy job
       - name: Upload artifact
@@ -100,6 +100,7 @@ jobs:
         with:
           app-name: 'elysian-signup-server'  # Your Azure Web App name
           slot-name: 'Production'
+          startup-command: 'pip install -r requirements.txt && python app.py' 
 
       # Step 5: Configure application settings
       - name: Configure App Settings
