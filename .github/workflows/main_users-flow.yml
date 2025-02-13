@@ -98,7 +98,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'elysian-signin-deploy'  # Your Azure Web App name
+          app-name: 'elysian-signin-server'  # Your Azure Web App name
           slot-name: 'Production'
 
       # Step 5: Configure application settings
@@ -107,7 +107,7 @@ jobs:
         with:
           inlineScript: |
             az webapp config appsettings set \
-              --name elysian-signin-deploy \
+              --name elysian-signin-server \
               --resource-group elysian-group \
               --settings \
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
