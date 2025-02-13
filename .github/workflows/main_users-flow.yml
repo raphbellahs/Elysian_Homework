@@ -44,11 +44,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 5: Run tests (uncomment and modify as needed)
-      # - name: Run tests
-      #   run: |
-      #     cd registration-system/server
-      #     python -m pytest
+      # Step 5: Run tests
+      - name: Run tests
+        run: |
+          cd registration-system/server
+          python -m pytest tests/ -v
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
 
       # Step 6: Prepare deployment package
       - name: Create deployment package
