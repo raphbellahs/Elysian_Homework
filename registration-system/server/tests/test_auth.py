@@ -11,22 +11,16 @@ USE_LIVE_SERVER = os.getenv('USE_LIVE_SERVER', 'false').lower() == 'true'
 @pytest.fixture
 def client():
     if USE_LIVE_SERVER:
-        # Return a session object for live server testing
-        return requests.Session()
+        return requests.Session()  # Return the session directly
     else:
-        # Return Flask test client for local testing
         app.config['TESTING'] = True
-        with app.test_client() as client:
-            yield client
+        return app.test_client()  # Return the test client directly
 
 @pytest.fixture(autouse=True)
 def cleanup():
-    if not USE_LIVE_SERVER:  # Only clean local database
+    if not USE_LIVE_SERVER:
         db.users.delete_many({})
-        yield
-        db.users.delete_many({})
-    else:
-        yield
+    yield
 
 def make_request(client, method, endpoint, data=None):
     """Helper function to make requests to either local or live server"""
