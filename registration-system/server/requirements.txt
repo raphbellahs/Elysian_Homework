@@ -12,3 +12,7 @@ werkzeug==2.0.1
 # Testing dependencies
 pytest==7.4.4
 pytest-cov==4.1.0
+
+# MongoDB dependencies
+pymongo[srv]==4.6.1
+dnspython==2.4.2
