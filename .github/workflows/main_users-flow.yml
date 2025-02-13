@@ -44,8 +44,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 5: Run tests
-      - name: Run tests
+      # Step 5: Run local tests
+      - name: Run local tests
         run: |
           cd registration-system/server
           python -m pytest tests/ -v
@@ -53,6 +53,7 @@ jobs:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
+          USE_LIVE_SERVER: "false"
 
       # Step 6: Prepare deployment package
       - name: Create deployment package
@@ -118,3 +119,15 @@ jobs:
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
                 MESSAGE_SERVICE_URL="${{ secrets.MESSAGE_SERVICE_URL }}" 
+
+      # Step 7: Run online tests
+      - name: Run online tests
+        run: |
+          cd registration-system/server
+          python -m pytest tests/ -v
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MESSAGE_SERVICE_URL: ${{ secrets.MESSAGE_SERVICE_URL }}
+          USE_LIVE_SERVER: "true"
+          API_URL: ${{ steps.deploy-to-webapp.outputs.webapp-url }}  # Get URL from deployment output
