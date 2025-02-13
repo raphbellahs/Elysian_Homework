@@ -56,18 +56,10 @@ jobs:
               --resource-group elysian-ressource \
               --settings \
                 OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-                WEBSITE_RUN_FROM_PACKAGE="1" \
-                WEBSITES_PORT="3000" \
+                WEBSITES_PORT="8080" \
+                PORT="8080" \
+                WEBSITE_NODE_DEFAULT_VERSION="~18" \
                 NODE_ENV="production"
-
-      - name: Configure Node.js
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az webapp config set \
-              --name elysian-message-service \
-              --resource-group elysian-ressource \
-              --linux-fx-version "NODE|18-lts"
 
       - name: Restart Web App
         uses: azure/CLI@v1
