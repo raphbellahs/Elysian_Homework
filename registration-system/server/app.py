@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from database import Database
 import requests
 import os
@@ -8,6 +9,15 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
+# Enable CORS for all routes
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000", "https://your-frontend-domain.com"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 db = Database()
 
 # Message service URL (Node.js server)
