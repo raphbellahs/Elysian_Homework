@@ -1,8 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const OpenAI = require('openai');
+const cors = require('cors');
 
 const app = express();
+
+// Enable CORS for all routes
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://your-frontend-domain.com'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 const openai = new OpenAI({
