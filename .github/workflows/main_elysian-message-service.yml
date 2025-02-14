@@ -1,0 +1,68 @@
+name: Deploy Message Service to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'registration-system/message-service/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd registration-system/message-service
+          npm install
+
+      - name: Create deployment package
+        run: |
+          cd registration-system/message-service
+          zip -r ../../release.zip ./*
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'elysian-message-service'
+          package: release.zip
+          startup-command: 'npm start'
+
+      - name: Configure App Settings
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp config appsettings set \
+              --name elysian-message-service \
+              --resource-group elysian-ressource \
+              --settings \
+                OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+                WEBSITES_PORT="8080" \
+                PORT="8080" \
+                WEBSITE_NODE_DEFAULT_VERSION="~18" \
+                NODE_ENV="production"
+
+      - name: Restart Web App
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp restart --name elysian-message-service --resource-group elysian-ressource
