@@ -7,6 +7,8 @@ import {
   IconButton,
   InputAdornment,
   Alert,
+  CircularProgress,
+  Snackbar,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
@@ -67,20 +69,55 @@ export default function RegisterForm() {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' // 'success' or 'error'
+  });
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Form validation
+    if (!formData.email || !formData.password || !formData.username) {
+      setSnackbar({
+        open: true,
+        message: 'Please fill in all fields',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
-      await register(formData);
-      setSuccess(true);
-      setError('');
+      setLoading(true);
+      
+      const response = await register(formData);
+      
+      // Show success message with welcome message
+      setSnackbar({
+        open: true,
+        message: response.welcomeMessage || 'Registration successful!',
+        severity: 'success'
+      });
+
+      // Clear form
       setFormData({ username: '', email: '', password: '' });
+
+      // Navigate to login after success
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+
     } catch (err) {
-      setError(err.message);
-      setSuccess(false);
+      setSnackbar({
+        open: true,
+        message: err.message,
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,6 +127,10 @@ export default function RegisterForm() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   return (
@@ -117,16 +158,31 @@ export default function RegisterForm() {
 
       {/* Right side - Register form */}
       <FormSection>
-        <Box sx={{ maxWidth: 400, width: '100%', mx: 'auto' }}>
+        <Box sx={{ maxWidth: 400, width: '100%', mx: 'auto', position: 'relative' }}>
           <Typography variant="h5" sx={{ mb: 4, textAlign: 'center', color: colors.primary }}>
             Create Account
           </Typography>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Registration successful!
-            </Alert>
+          {/* Loading Overlay */}
+          {loading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                zIndex: 1,
+              }}
+            >
+              <CircularProgress />
+              <Typography sx={{ mt: 2 }}>Creating your account...</Typography>
+            </Box>
           )}
 
           <form onSubmit={handleSubmit}>
@@ -143,6 +199,7 @@ export default function RegisterForm() {
               value={formData.username}
               onChange={handleChange}
               sx={{ mb: 2 }}
+              disabled={loading}
               InputProps={{
                 sx: { borderRadius: 2 }
               }}
@@ -162,6 +219,7 @@ export default function RegisterForm() {
               value={formData.email}
               onChange={handleChange}
               sx={{ mb: 2 }}
+              disabled={loading}
               InputProps={{
                 sx: { borderRadius: 2 }
               }}
@@ -180,6 +238,7 @@ export default function RegisterForm() {
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleChange}
+              disabled={loading}
               sx={{ mb: 3 }}
               InputProps={{
                 sx: { borderRadius: 2 },
@@ -188,6 +247,7 @@ export default function RegisterForm() {
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      disabled={loading}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -201,6 +261,7 @@ export default function RegisterForm() {
               fullWidth
               type="submit"
               variant="contained"
+              disabled={loading}
               sx={{
                 mb: 3,
                 borderRadius: 2,
@@ -211,7 +272,14 @@ export default function RegisterForm() {
                 },
               }}
             >
-              Register
+              {loading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={20} color="inherit" />
+                  Registering...
+                </Box>
+              ) : (
+                'Register'
+              )}
             </Button>
 
             {/* Social registration section */}
@@ -255,6 +323,23 @@ export default function RegisterForm() {
           </form>
         </Box>
       </FormSection>
+
+      {/* Toast Notification */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </RegisterContainer>
   );
 } 
