@@ -31,4 +31,5 @@ gunicorn==21.2.0
 whitenoise==6.6.0  # For serving static files
 
 # Healthcheck
-healthcheck==1.0.0flask-cors==4.0.0
+healthcheck==1.0.0
+flask-cors==4.0.0
