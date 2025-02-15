@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
-import { colors, images, icons } from '../assets';
+import { colors, images, icons } from '../../../mobile_screen/LoginApp/assets';
 import { register } from '../api';
 import { useNavigate } from 'react-router-dom';
 
@@ -317,7 +317,7 @@ export default function RegisterForm() {
                   }
                 }}
               >
-                Log in
+                Log In
               </Button>
             </Typography>
           </form>
