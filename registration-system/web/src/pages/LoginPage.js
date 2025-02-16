@@ -11,6 +11,9 @@ import {
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { colors, images, icons } from '../assets';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { login } from '../api';
 
 // Custom styled components
 const LoginContainer = styled(Box)(({ theme }) => ({
@@ -79,10 +82,41 @@ const LoginPage = () => {
     navigate('/register');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Add login logic here
-    console.log('Login attempt:', formData);
+    try {
+      const response = await login({
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      // Show success toast with API message
+      toast.success(response.message || 'Login successful!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+
+      // Clear form data after successful login
+      setFormData({
+        email: '',
+        password: '',
+      });
+
+    } catch (error) {
+      // Show error toast with API error message
+      toast.error(error.response?.data?.message || error.message || 'Login failed', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
   };
 
   return (

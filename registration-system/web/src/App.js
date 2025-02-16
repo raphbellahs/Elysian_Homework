@@ -5,6 +5,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import LoginPage from './pages/LoginPage';
 import RegisterForm from './pages/RegisterForm';
 import { colors } from './assets';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Create theme with our brand colors
 const theme = createTheme({
@@ -70,14 +72,17 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterForm />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </ThemeProvider>
+    <>
+      <ToastContainer />
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterForm />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </ThemeProvider>
+    </>
   );
 }
 

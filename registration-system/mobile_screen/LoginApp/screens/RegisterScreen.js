@@ -29,12 +29,18 @@ export default function RegisterScreen({ navigation }) {
     try {
       const response = await authService.register(email, password, name);
       console.log('Registration successful:', response);
-      Alert.alert('Success', 'Registration successful!', [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Login')
-        }
-      ]);
+      
+      // Show welcome message from API response
+      Alert.alert(
+        'Welcome!', 
+        response.welcomeMessage || 'Registration successful!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login')
+          }
+        ]
+      );
     } catch (error) {
       console.error('Registration error:', error);
       Alert.alert('Error', error.message || 'Registration failed');
